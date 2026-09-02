@@ -1,0 +1,143 @@
+# ---------------------------------------------------------------------------
+# Lab 04 starter — 部署到 test 環境（OIDC + az vm run-command）
+#
+# 目的地：.github/workflows/lab04-deploy-test.yml
+#
+# 事前準備（講師會在課堂上給你實際值）：
+#   Repository variables : AZURE_RESOURCE_GROUP / AZURE_VM_NAME / VM_PUBLIC_IP
+#   Repository secrets   : AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID
+#   GitHub Environment   : test
+#   Repo 可見度          : public（VM 要匿名下載 release asset）
+#
+# 目標環境契約（不可改）：
+#   test → systemd service `simpleweb-test`，port 8080，
+#          jar 放在 /opt/simpleweb/test/simpleweb.jar
+#          環境變數檔 /opt/simpleweb/test/app.env（systemd 讀這一份）
+#
+# 交付路徑：build job 把 jar 發佈成 `build-latest` 這個 rolling pre-release，
+#           VM 端用匿名 curl 下載。**絕對不要把任何 token 傳給 VM。**
+# ---------------------------------------------------------------------------
+
+name: Lab04 Deploy to Test
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# workflow 層級維持最小權限，需要更多的 job 自己提升。
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # TODO 1: 這個 job 要建立／更新 release，需要哪一個權限？
+    #   permissions:
+    #     contents: ???
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B verify
+
+      # TODO 2: 沿用 Lab03 的做法，把 target/simpleweb.jar 上傳成 workflow artifact
+      #   （名稱 simpleweb-jar；這是給人下載／除錯用的）
+
+      # TODO 3: 把 jar 發佈成 rolling pre-release `build-latest`
+      #   gh CLI 在 GitHub 託管 runner 上已預裝，只要提供 GH_TOKEN 即可。
+      #
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     set -euo pipefail
+      #     if ! gh release view build-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+      #       gh release create build-latest \
+      #         --repo "$GITHUB_REPOSITORY" \
+      #         --prerelease \
+      #         --title "build-latest" \
+      #         --notes "GH-200 lab 用的滾動式建置產出。"
+      #     fi
+      #     gh release upload build-latest target/simpleweb.jar \
+      #       --repo "$GITHUB_REPOSITORY" --clobber
+      #
+      #   想一下：--clobber 是做什麼用的？沒有它會發生什麼事？
+
+  deploy-test:
+    runs-on: ubuntu-latest
+
+    # TODO 4: 等 build 完成
+    #   needs: ???
+
+    # TODO 5: 綁定 GitHub Environment `test`，並設定 url 讓 Actions 頁面出現連結
+    #   environment:
+    #     name: ???
+    #     url: http://${{ vars.VM_PUBLIC_IP }}:8080/
+
+    # TODO 6: 最小權限。OIDC 一定要 id-token: write。
+    #         注意：這個 job 不需要 contents: write，也不需要任何 token 給 VM。
+    #   permissions:
+    #     contents: read
+    #     id-token: ???
+
+    steps:
+      # TODO 7: 用 OIDC 登入 Azure
+      #   uses: azure/login@v3
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ???
+      #     subscription-id: ???
+
+      # TODO 8: 呼叫 az vm run-command invoke 部署
+      #   下面已經幫你寫好會在 VM 上跑的 shell script（$1..$4 是傳進去的參數），
+      #   你要補的是 --resource-group / --name / --parameters 這幾行。
+      #
+      #   env:
+      #     JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
+      #   run: |
+      #     az vm run-command invoke \
+      #       --resource-group "${{ vars.??? }}" \
+      #       --name "${{ vars.??? }}" \
+      #       --command-id RunShellScript \
+      #       --parameters "$JAR_URL" "???" "???" "${{ github.sha }}" \
+      #       --scripts '
+      #         set -euo pipefail
+      #         JAR_URL="$1"; ENV_DIR="$2"; SERVICE="$3"; SHA="$4"
+      #         STAGING="/opt/simpleweb/staging/$ENV_DIR"
+      #         TARGET="/opt/simpleweb/$ENV_DIR"
+      #         sudo mkdir -p "$STAGING" "$TARGET"
+      #         sudo rm -f "$STAGING/simpleweb.jar"
+      #         sudo curl -fsSL -o "$STAGING/simpleweb.jar" "$JAR_URL"
+      #         sudo unzip -tq "$STAGING/simpleweb.jar"
+      #         sudo install -m 0644 -o root -g root "$STAGING/simpleweb.jar" "$TARGET/simpleweb.jar"
+      #         sudo touch "$TARGET/app.env"
+      #         sudo sed -i "/^APP_BUILD_SHA=/d; /^APP_BUILD_TIME=/d" "$TARGET/app.env"
+      #         printf "APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n" "$SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      #           | sudo tee -a "$TARGET/app.env" >/dev/null
+      #         sudo chown root:root "$TARGET/app.env"
+      #         sudo chmod 0644 "$TARGET/app.env"
+      #         sudo systemctl restart "$SERVICE"
+      #         sleep 5
+      #         sudo systemctl is-active "$SERVICE"
+      #       ' \
+      #       --output table
+      #
+      #   提示：ENV_DIR 要填 test（對應 /opt/simpleweb/test），
+      #         SERVICE 要填 simpleweb-test。
+      #   注意：script 用 sed 只覆蓋 APP_BUILD_* 兩行，
+      #         是為了保留 app.env 裡既有的 SERVER_PORT / APP_ENVIRONMENT。
+
+      # TODO 9: Smoke test
+      #   對 http://${{ vars.VM_PUBLIC_IP }}:8080/actuator/health 做 curl，
+      #   最多重試 12 次、每次間隔 5 秒；全部失敗就 exit 1。
+      - name: Placeholder（做完上面 TODO 後可以刪掉）
+        run: echo "請把上面的 TODO 換成真正的 steps"
