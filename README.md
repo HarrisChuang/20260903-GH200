@@ -6,6 +6,27 @@ GitHub Actions workflow，不是這支應用程式。
 它做的事只有一件：**用一個超大的顏色橫幅告訴你「我是哪個環境、我是哪一版」**，
 所以只要打開瀏覽器，全班就能立刻確認剛剛那次部署到底有沒有生效。
 
+## 課程入口
+
+- **學員練習手冊**：[labs/README.md](labs/README.md)
+- **Workflow 範例**：[.github/workflows/](.github/workflows/)
+- **Test 環境**：<http://20.210.89.243:8080>
+- **Production 環境**：<http://20.210.89.243:8081>
+
+### 漸進式 Workflow
+
+| No. | Workflow | 學習重點 |
+| --- | --- | --- |
+| 01 | `01.build.yml` | 第一個 workflow、trigger、job、step |
+| 02 | `02.build-test.yml` | CI、測試、log、job summary |
+| 03 | `03.package-artifact.yml` | `needs`、artifact、job 間傳檔 |
+| 04 | `04.deploy-test.yml` | OIDC 登入 Azure、部署到 test |
+| 05 | `05.deploy-prod.yml` | GitHub Environment、approval gate |
+| 06 | `06.full-pipeline.yml` | Build → Test → Package → Deploy |
+| 07 | `07.deploy-ssh.yml` | SSH 與 OIDC 安全性對照 |
+| 08 | `08.selfhosted-runner.yml` | Self-hosted runner（選修） |
+| 09 | `09.troubleshooting.yml` | 故意失敗，用 workflow log 找錯 |
+
 | 環境 (`APP_ENVIRONMENT`) | 橫幅顏色 |
 | --- | --- |
 | `test` | 藍色 |
@@ -134,10 +155,11 @@ Unit 檔大致長這樣（`/etc/systemd/system/simpleweb-test.service`）：
 [Service]
 Environment=SERVER_PORT=8080
 Environment=APP_ENVIRONMENT=test
-Environment=APP_BUILD_SHA=<git sha>
-Environment=APP_BUILD_TIME=<build time>
+EnvironmentFile=-/opt/simpleweb/test/app.env
 ExecStart=/usr/bin/java -jar /opt/simpleweb/test/simpleweb.jar
 ```
+
+部署 workflow 會把 `APP_BUILD_SHA` 與 `APP_BUILD_TIME` 寫入 `app.env`。
 
 部署後的驗證方式：
 
