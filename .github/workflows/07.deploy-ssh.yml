@@ -53,13 +53,14 @@ jobs:
       - name: Copy jar to VM
         run: |
           scp -i ~/.ssh/id_deploy target/simpleweb.jar \
-            azureuser@${{ vars.VM_PUBLIC_IP }}:/tmp/simpleweb.jar
+            azureuser@${{ vars.VM_PUBLIC_IP }}:~/simpleweb.jar
 
       - name: Restart service on VM
         run: |
           ssh -i ~/.ssh/id_deploy azureuser@${{ vars.VM_PUBLIC_IP }} \
             "set -euo pipefail
-             sudo install -o simpleweb -g simpleweb -m 0644 /tmp/simpleweb.jar /opt/simpleweb/test/simpleweb.jar
+             sudo install -o simpleweb -g simpleweb -m 0644 ~/simpleweb.jar /opt/simpleweb/test/simpleweb.jar
+             rm -f ~/simpleweb.jar
              printf 'APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n' '${{ github.sha }}' \"\$(date -u +%FT%TZ)\" | sudo tee /opt/simpleweb/test/app.env >/dev/null
              sudo systemctl restart simpleweb-test
              sleep 5
