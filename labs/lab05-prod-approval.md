@@ -130,6 +130,10 @@ jobs:
 
 ## 常見錯誤
 
+> Production 解答沿用 Lab 04 的 fail-closed 模式：SHA-256 驗證、`DEPLOY_OK`
+> sentinel，以及 `/api/info` build SHA 比對。若舊服務仍健康但新部署失敗，workflow
+> 必須保持紅燈。
+
 | 症狀 | 原因 | 修法 |
 |---|---|---|
 | `deploy-prod` 直接就跑了，沒有停下來 | environment 名稱拼錯，或該 environment 沒設 required reviewer | 確認是 `production`（不是 `prod`）且已加審核者 |

@@ -28,6 +28,13 @@ jobs:
           chmod +x ./mvnw
           ./mvnw -B verify
 
+      - name: Create SHA-256 checksum
+        run: |
+          set -euo pipefail
+          cd target
+          sha256sum simpleweb.jar > simpleweb.jar.sha256
+          cat simpleweb.jar.sha256
+
       - name: Upload jar as workflow artifact
         uses: actions/upload-artifact@v7
         with:
@@ -48,9 +55,9 @@ jobs:
               --title "build-latest" \
               --notes "GH-200 lab 用的滾動式建置產出，由 workflow 自動更新。"
           fi
-          gh release upload build-latest target/simpleweb.jar \
+          gh release upload build-latest \
+            target/simpleweb.jar target/simpleweb.jar.sha256 \
             --repo "$GITHUB_REPOSITORY" --clobber
-          echo "已發佈：https://github.com/$GITHUB_REPOSITORY/releases/download/build-latest/simpleweb.jar"
 
   deploy-test:
     runs-on: ubuntu-latest
@@ -69,29 +76,39 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # VM 可能是 deallocated／stopped 狀態；az vm start 具有冪等性，
+      # 已在執行中會直接返回。沒有這一步，RunCommand 會失敗或無限等待。
       - name: Ensure VM is running
         run: |
           az vm start \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}"
+
       - name: Deploy jar to VM and restart service
         env:
           # public repo 的 release asset 可匿名下載，因此不需要把任何 token 交給 VM。
           JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
+          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
         run: |
-          az vm run-command invoke \
+          set -euo pipefail
+          OUT="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}" \
             --command-id RunShellScript \
-            --parameters "$JAR_URL" "test" "simpleweb-test" "${{ github.sha }}" \
+            --parameters "$JAR_URL" "$SHA_URL" "test" "simpleweb-test" "${{ github.sha }}" \
             --scripts '
+              # RunShellScript 是用 /bin/sh 執行，不是 bash：
+              # 只能用 POSIX 語法，沒有 pipefail、[[ ]]、陣列。
               set -eu
-              JAR_URL="$1"; ENV_DIR="$2"; SERVICE="$3"; SHA="$4"
+              JAR_URL="$1"; SHA_URL="$2"; ENV_DIR="$3"; SERVICE="$4"; SHA="$5"
               STAGING="/opt/simpleweb/staging/$ENV_DIR"
               TARGET="/opt/simpleweb/$ENV_DIR"
               sudo mkdir -p "$STAGING" "$TARGET"
-              sudo rm -f "$STAGING/simpleweb.jar"
+              sudo rm -f "$STAGING/simpleweb.jar" "$STAGING/simpleweb.jar.sha256"
               sudo curl -fsSL -o "$STAGING/simpleweb.jar" "$JAR_URL"
+              sudo curl -fsSL -o "$STAGING/simpleweb.jar.sha256" "$SHA_URL"
+              cd "$STAGING"
+              sudo sha256sum -c simpleweb.jar.sha256
               sudo install -m 0644 -o root -g root "$STAGING/simpleweb.jar" "$TARGET/simpleweb.jar"
               sudo touch "$TARGET/app.env"
               sudo sed -i "/^APP_BUILD_SHA=/d; /^APP_BUILD_TIME=/d" "$TARGET/app.env"
@@ -102,26 +119,37 @@ jobs:
               sudo systemctl restart "$SERVICE"
               sleep 5
               sudo systemctl is-active "$SERVICE"
+              echo "DEPLOY_OK $SHA"
             ' \
-            --output table
+            --query "value[].message" -o tsv)"
+          echo "$OUT"
+          # RunCommand 的「控制平面成功」只代表指令送達並執行完畢，
+          # 不代表 script 內容成功。一定要自己驗證結尾標記。
+          if ! printf '%s' "$OUT" | grep -q "DEPLOY_OK ${{ github.sha }}"; then
+            echo "❌ RunCommand 回報成功，但 VM 上的 script 沒有跑到最後（找不到 DEPLOY_OK 標記）"
+            exit 1
+          fi
 
       - name: Smoke test http://VM:8080
         run: |
           set -euo pipefail
           BASE="http://${{ vars.VM_PUBLIC_IP }}:8080"
-          body=''
+          EXPECTED="${{ github.sha }}"
           for i in $(seq 1 12); do
-            body="$(curl -fsS --max-time 5 "$BASE/api/info" || true)"
-            if printf '%s' "$body" | grep -q "${{ github.sha }}"; then
-              echo "✅ 服務已啟動"
-              echo "$body"
-              exit 0
+            if BODY="$(curl -fsS --max-time 5 "$BASE/api/info")"; then
+              echo "$BODY"
+              # 只確認「有回應」是不夠的：舊版本還活著時一樣會回 200。
+              # 必須確認回傳內容含有這次的 commit SHA。
+              if printf '%s' "$BODY" | grep -q "$EXPECTED"; then
+                echo "✅ test 環境已更新到 $EXPECTED"
+                exit 0
+              fi
+              echo "服務有回應，但 build SHA 尚未更新為 $EXPECTED（可能是舊版本仍在執行）"
             fi
-            echo "等待服務啟動中... ($i/12)"
+            echo "等待服務更新中... ($i/12)"
             sleep 5
           done
-          echo "❌ 服務在 60 秒內沒有回報這次 commit"
-          echo "最後回應：$body"
+          echo "❌ 60 秒內服務未回報預期的 build SHA"
           exit 1
 
       - name: Summary
@@ -134,4 +162,5 @@ jobs:
             echo "- URL: http://${{ vars.VM_PUBLIC_IP }}:8080/"
             echo "- Commit: \`${{ github.sha }}\`"
             echo "- Jar 來源: \`build-latest\` release asset（匿名下載，未傳遞任何 token）"
+            echo "- 完整性: \`sha256sum -c\` 於 VM 端驗證"
           } >> "$GITHUB_STEP_SUMMARY"

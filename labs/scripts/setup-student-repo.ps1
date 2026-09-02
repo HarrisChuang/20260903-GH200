@@ -100,7 +100,11 @@ Write-Step "準備你自己的 repo：$myRepo"
 
 & gh repo view $myRepo --json name 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
-    Write-Ok "$myRepo 已存在，沿用（不做任何刪除或覆寫）"
+    $repoIdentity = & gh repo view $myRepo --json isFork,parent | ConvertFrom-Json
+    if (-not $repoIdentity.isFork -or $repoIdentity.parent.nameWithOwner -ne $UpstreamRepo) {
+        throw "$myRepo 已存在，但不是 $UpstreamRepo 的 fork；為避免修改無關 repo，腳本停止。"
+    }
+    Write-Ok "$myRepo 已存在且已確認是 $UpstreamRepo 的 fork"
 }
 else {
     Write-Host "    fork $UpstreamRepo ..."
@@ -145,9 +149,9 @@ Write-Step '啟用 GitHub Actions'
 
 & gh api --method PUT "repos/$myRepo/actions/permissions" `
     -H 'Accept: application/vnd.github+json' `
-    -F enabled=true -f allowed_actions=all | Out-Null
+    -F enabled=true | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Actions 啟用失敗，請確認你對該 repo 有 admin 權限。' }
-Write-Ok 'Actions 已啟用'
+Write-Ok 'Actions 已啟用（保留既有 allowed-actions policy）'
 
 # ---------------------------------------------------------------------------
 # 5b. 可見度檢查（Lab04/05 需要 public 才能讓 VM 匿名下載 release asset）

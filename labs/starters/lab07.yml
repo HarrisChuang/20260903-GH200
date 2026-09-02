@@ -19,7 +19,7 @@ jobs:
   on-self-hosted:
     # TODO 1: 指定要跑在你在 VM 上註冊的 self-hosted runner。
     #   需要同時符合多個標籤時，runs-on 要寫成「清單」。
-    #   建議標籤：self-hosted, Linux, X64, gh200-lab
+    #   建議標籤：self-hosted, Linux, X64, gh200
     #   runs-on: [ ???, ??? ]
     runs-on: TODO-RUNNER-LABELS
 

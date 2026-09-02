@@ -15,9 +15,16 @@ on:
         description: 輸入 deploy 以確認要部署到正式環境
         required: true
         default: ''
+      build_sha:
+        description: 要 promote 的完整 40 字元 commit SHA
+        required: true
 
 permissions:
   contents: read
+
+concurrency:
+  group: simpleweb-deploy
+  cancel-in-progress: false
 
 jobs:
   guard:
@@ -48,14 +55,18 @@ jobs:
       - name: Resolve and validate promoted build SHA
         id: promoted
         env:
-          SHA_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/build-sha.txt
+          REQUESTED_SHA: ${{ inputs.build_sha }}
         run: |
-          expected_sha="$(curl -fsSL "$SHA_URL")"
-          if ! printf '%s' "$expected_sha" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "Release build SHA 格式無效" >&2
+          if ! printf '%s' "$REQUESTED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "輸入的 build SHA 格式無效" >&2
             exit 1
           fi
-          echo "sha=$expected_sha" >> "$GITHUB_OUTPUT"
+          release_sha="$(curl -fsSL "${{ github.server_url }}/${{ github.repository }}/releases/download/build-${REQUESTED_SHA}/build-sha.txt")"
+          if [ "$release_sha" != "$REQUESTED_SHA" ]; then
+            echo "Release metadata 與要求 promote 的 SHA 不一致" >&2
+            exit 1
+          fi
+          echo "sha=$REQUESTED_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Azure login (OIDC)
         uses: azure/login@v3
@@ -71,11 +82,11 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}"
 
-      # 部署 04 已經驗證過、發佈在 build-latest 上的同一份 jar
+      # 部署指定 commit 已經驗證過的同一份 jar
       - name: Deploy to production VM
         env:
-          JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
-          DIGEST_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
+          JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-${{ steps.promoted.outputs.sha }}/simpleweb.jar
+          DIGEST_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-${{ steps.promoted.outputs.sha }}/simpleweb.jar.sha256
           EXPECTED_SHA: ${{ steps.promoted.outputs.sha }}
         run: |
           output="$(az vm run-command invoke \
@@ -100,6 +111,8 @@ jobs:
           printf '%s' "$output" | grep -q DEPLOY_OK
 
       - name: Smoke test
+        env:
+          EXPECTED_SHA: ${{ steps.promoted.outputs.sha }}
         run: |
           body=''
           for i in $(seq 1 10); do

@@ -40,7 +40,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
       # 用 Maven Wrapper (./mvnw)，所以 runner 不需要事先安裝 Maven
       - name: Compile

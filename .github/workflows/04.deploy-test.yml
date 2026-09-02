@@ -19,8 +19,12 @@ permissions:
   contents: write # 發佈 release asset 需要寫入權限
   id-token: write # OIDC 換發 token 必要！
 
+concurrency:
+  group: simpleweb-deploy
+  cancel-in-progress: false
+
 env:
-  RELEASE_TAG: build-latest
+  RELEASE_TAG: build-${{ github.sha }}
 
 jobs:
   deploy-test:
@@ -37,7 +41,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
       - name: Build and test
         run: ./mvnw -B verify
@@ -71,8 +74,8 @@ jobs:
 
       - name: Deploy to test VM
         env:
-          JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
-          DIGEST_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
+          JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/simpleweb.jar
+          DIGEST_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/simpleweb.jar.sha256
         run: |
           output="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \

@@ -171,7 +171,8 @@ job outputs 需要兩件事一起做：
 
 ## 你要自己完成的 YAML
 
-- 四個修正版：把 `starters/lab06-broken-N.yml` 改好（改在原檔上）
+- 四個修正版：修改你剛複製到 `.github/workflows/` 的檔案；保留
+  `starters/lab06-broken-N.yml` 原始題目，方便重做與比較。
 - 除錯記錄表：[`starters/lab06.yml`](starters/lab06.yml)，四個 case 的
   `where_i_saw_it` / `error_message` / `root_cause` / `fix` 都要填，
   外加 `debug_logging` 與 `rerun` 兩段。

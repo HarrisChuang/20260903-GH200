@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   on-self-hosted:
-    runs-on: [ self-hosted, Linux, X64, gh200-lab ]
+    runs-on: [ self-hosted, Linux, X64, gh200 ]
     steps:
       - name: Who am I
         run: |
@@ -32,7 +32,7 @@ jobs:
             echo ""
             echo "- Runner name: \`${RUNNER_NAME:-unknown}\`"
             echo "- Hostname: \`$(hostname)\`"
-            echo "- Labels: self-hosted, Linux, X64, gh200-lab"
+            echo "- Labels: self-hosted, Linux, X64, gh200"
             echo ""
             echo "> GitHub 託管 runner 每次都是全新的乾淨機器；"
             echo "> self-hosted runner 的狀態會保留，工具要自己裝、也要自己清。"

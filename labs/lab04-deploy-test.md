@@ -188,6 +188,14 @@ jobs:
 
 ## 常見錯誤
 
+> **控制平面綠燈不等於 VM script 成功。** `az vm run-command invoke` 可能在
+> VM script 已失敗時仍以 control-plane `Provisioning succeeded` 結束。解答會擷取
+> `value[].message`、要求 VM 最後輸出 `DEPLOY_OK`，並在安裝前用 SHA-256 sidecar
+> 驗證 jar；smoke test 還會確認 `/api/info` 的 `buildSha` 是本次 commit。
+>
+> Run Command 的 Linux script 由 `/bin/sh` 執行，因此 VM 端使用 POSIX
+> `set -eu`，不可使用 Bash 專屬的 `set -o pipefail`。
+
 | 症狀 | 原因 | 修法 |
 |---|---|---|
 | `Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable` | 少了 `id-token: write` | 在 deploy job 的 `permissions:` 補上 |

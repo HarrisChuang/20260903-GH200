@@ -37,7 +37,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
       # verify 會跑 unit test + integration test，並打包出 target/simpleweb.jar
       - name: Build and test

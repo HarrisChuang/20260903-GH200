@@ -57,7 +57,7 @@
    ```bash
    ./config.sh --url https://github.com/<your-account>/<your-repo> \
                --token <畫面上給你的 token> \
-               --labels gh200-lab \
+               --labels gh200 \
                --unattended
    ```
    - `--labels` 加上去的是**額外**標籤；`self-hosted`、`Linux`、`X64` 這幾個是自動加上的
@@ -70,7 +70,7 @@
    這是前景執行，關掉 SSH 就會停。課堂練習用前景就好，方便你直接看到它接到 job。
    （正式環境會用 `sudo ./svc.sh install` + `sudo ./svc.sh start` 註冊成系統服務。）
 
-6. 回到 GitHub 的 Runners 清單，確認你的 runner 狀態是 **Idle**，且 label 中有 `gh200-lab`。
+6. 回到 GitHub 的 Runners 清單，確認你的 runner 狀態是 **Idle**，且 label 中有 `gh200`。
 
 ### C. 用 workflow 指到它
 
@@ -78,7 +78,7 @@
 
 8. **補上 `runs-on:`。** 需要同時符合多個 label 時，要寫成清單：
    ```yaml
-   runs-on: [ self-hosted, Linux, X64, gh200-lab ]
+   runs-on: [ self-hosted, Linux, X64, gh200 ]
    ```
    意思是「找一台**同時**具備這四個 label 的 runner」。只寫 `self-hosted` 也能跑，但在有多台機器的環境中就無法精準指定——這正是 label 的用途。
 
@@ -148,7 +148,7 @@ permissions:
 
 jobs:
   on-self-hosted:
-    # TODO 1: runs-on 指向 self-hosted + Linux + X64 + gh200-lab
+    # TODO 1: runs-on 指向 self-hosted + Linux + X64 + gh200
     runs-on: TODO-RUNNER-LABELS
     steps:
       # TODO 2: 印出 hostname / uname -a / whoami / RUNNER_NAME / RUNNER_OS
@@ -158,7 +158,7 @@ jobs:
 
 ## 驗收標準
 
-- [ ] GitHub 的 Runners 清單中出現你的 runner，狀態 **Idle**，含 label `gh200-lab`
+- [ ] GitHub 的 Runners 清單中出現你的 runner，狀態 **Idle**，含 label `gh200`
 - [ ] 手動觸發後，job 成功執行且顯示**綠色勾勾**
 - [ ] log 中的 `hostname` 是那台 VM，**不是** GitHub 託管 runner 的名稱
 - [ ] 你在 SSH 視窗中親眼看到 runner 接到 job

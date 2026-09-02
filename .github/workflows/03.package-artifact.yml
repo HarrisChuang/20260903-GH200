@@ -7,7 +7,7 @@
 #
 # Artifact vs Cache（客戶要求 Cache 只講概念，不深入）
 #   - Cache    = 為了「加速」。內容掉了只是變慢，不影響正確性。例如相依套件。
-#                本檔用 setup-java 內建的 cache: maven 就夠了，不需要自己寫 actions/cache。
+#                本次依客戶要求只說明概念，不在 workflow 實作 cache。
 #   - Artifact = 為了「保存與交付產出物」。這是你要部署出去的東西。
 name: 03.package-artifact
 
@@ -35,7 +35,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
       - name: Build and test
         run: ./mvnw -B verify
@@ -74,5 +73,3 @@ jobs:
             echo "- 大小：$(du -h ./dist/simpleweb.jar | cut -f1)"
             echo "- 來源 commit：\`${GITHUB_SHA:0:7}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-
-

@@ -9,6 +9,11 @@
 # 目標環境契約（不可改）：
 #   test → simpleweb-test / 8080 / /opt/simpleweb/test/simpleweb.jar  + app.env
 #   prod → simpleweb-prod / 8081 / /opt/simpleweb/prod/simpleweb.jar  + app.env
+#
+# ⚠️ 延續 Lab04 的三個實測重點：
+#   1. VM 端 script 跑在 /bin/sh：只能 `set -eu`，不可 `set -euo pipefail`
+#   2. VM 上沒有 unzip，完整性用 `sha256sum -c` + release 的 .sha256 sidecar
+#   3. RunCommand 控制平面成功 ≠ script 成功；smoke test 必須驗到 commit SHA
 # ---------------------------------------------------------------------------
 
 name: Lab05 Promote to Production
@@ -23,7 +28,7 @@ permissions:
 
 jobs:
   # TODO 1: 把 Lab04 的 build job 原封不動搬過來
-  #   （含 contents: write 與發佈 build-latest 的步驟）
+  #   （含 contents: write、sha256 sidecar，以及發佈 build-latest 的步驟）
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -38,6 +43,12 @@ jobs:
         run: |
           chmod +x ./mvnw
           ./mvnw -B verify
+      - name: Create SHA-256 checksum
+        run: |
+          set -euo pipefail
+          cd target
+          sha256sum simpleweb.jar > simpleweb.jar.sha256
+          cat simpleweb.jar.sha256
       - name: Upload jar as workflow artifact
         uses: actions/upload-artifact@v7
         with:
@@ -55,10 +66,12 @@ jobs:
               --prerelease --title "build-latest" \
               --notes "GH-200 lab 用的滾動式建置產出。"
           fi
-          gh release upload build-latest target/simpleweb.jar \
+          gh release upload build-latest \
+            target/simpleweb.jar target/simpleweb.jar.sha256 \
             --repo "$GITHUB_REPOSITORY" --clobber
 
   # TODO 2: 把 Lab04 的 deploy-test job 搬過來（內容完全一樣）
+  #   別忘了包含「Ensure VM is running」那一步
   deploy-test:
     runs-on: ubuntu-latest
     needs: build
@@ -85,16 +98,20 @@ jobs:
     steps:
       # TODO 3d: azure/login@v3（OIDC，同 Lab04）
 
-      # TODO 3e: 先用 az vm start 確保 VM 正在執行（同 Lab04）
+      # TODO 3e: az vm start（每個 RunCommand 之前都要，VM 可能是 deallocated）
 
       # TODO 3f: az vm run-command invoke
       #   與 Lab04 幾乎相同，只有三個地方要改：
       #     ENV_DIR : test → ???
       #     SERVICE : simpleweb-test → ???
       #     port    : 8080 → ???
-      #   JAR_URL 完全相同（都是 build-latest 這個 release asset）
-      #   （加分題：覆蓋前先把舊 jar 備份成 simpleweb.jar.previous）
+      #   JAR_URL / SHA_URL 完全相同（都是 build-latest 這個 release asset）
+      #   VM 端仍是 /bin/sh：`set -eu`，結尾 echo "DEPLOY_OK $SHA"
+      #   app.env 一樣只更新 APP_BUILD_* 兩行，不要整份覆寫
+      #   （加分：覆蓋前備份成 simpleweb.jar.previous）
+      #   runner 端記得 grep DEPLOY_OK 驗證，不要只信 RunCommand 的回傳碼
 
-      # TODO 3f: Smoke test http://${{ vars.VM_PUBLIC_IP }}:8081/actuator/health
+      # TODO 3g: Smoke test http://${{ vars.VM_PUBLIC_IP }}:8081/api/info
+      #   必須確認回應內容包含 ${{ github.sha }}，只看 200 會被舊版本騙過去
       - name: Placeholder
         run: echo "請把上面的 TODO 換成真正的 steps"
