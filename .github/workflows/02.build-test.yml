@@ -40,7 +40,7 @@ jobs:
       # 測試報告是 build 的產出物，即使失敗也要留下來供除錯
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: target/surefire-reports/
@@ -58,3 +58,4 @@ jobs:
             echo "| 觸發事件 | \`${GITHUB_EVENT_NAME}\` |"
             echo "| 結果 | ${{ job.status }} |"
           } >> "$GITHUB_STEP_SUMMARY"
+

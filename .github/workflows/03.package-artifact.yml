@@ -36,7 +36,7 @@ jobs:
 
       # 只上傳「要部署的那一個檔案」，不要整個 target/ 都丟上去
       - name: Upload deployable jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: simpleweb-jar
           path: target/simpleweb.jar
@@ -49,7 +49,7 @@ jobs:
     needs: build
     steps:
       - name: Download deployable jar
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: simpleweb-jar
           path: ./dist
@@ -68,3 +68,4 @@ jobs:
             echo "- 大小：$(du -h ./dist/simpleweb.jar | cut -f1)"
             echo "- 來源 commit：\`${GITHUB_SHA:0:7}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
