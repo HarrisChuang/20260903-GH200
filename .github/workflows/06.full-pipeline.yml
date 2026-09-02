@@ -12,6 +12,12 @@ name: 06.full-pipeline
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'mvnw'
+      - '.mvn/**'
+      - '.github/workflows/06.full-pipeline.yml'
   workflow_dispatch:
 
 permissions:
@@ -182,5 +188,4 @@ jobs:
             echo ""
             echo "版本：\`${{ needs.build.outputs.sha_short }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-
 
