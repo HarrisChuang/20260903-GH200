@@ -107,13 +107,14 @@ gh variable set VM_PUBLIC_IP --repo <your-account>/20260903-GH200 --body "<實�
 - [ ] 瀏覽器可以連到 GitHub
 - [ ] 你自己帳號底下有一份課程 repo（fork 或 clone），且 **Actions 已啟用**
 - [ ] repo 中已建立 environment：`test` 與 `production`
-- [ ] repo secrets：`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`（講師提供）
+- [ ] 若講師已授權你執行 CD：repo secrets `AZURE_CLIENT_ID` /
+  `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`
 - [ ] repo variables：`AZURE_RESOURCE_GROUP` / `AZURE_VM_NAME` / `VM_PUBLIC_IP`（講師提供）
 - [ ] 你的 repo 是 **public**（Lab 04／05 的 VM 需要匿名下載 release asset）
 
 ### 一鍵設定腳本
 
-上面第 8～10 項可以用腳本完成：
+上面 repo/environment 設定可以用腳本完成：
 
 **Windows（PowerShell）**
 ```powershell
@@ -129,7 +130,8 @@ chmod +x setup-student-repo.sh
 ```
 
 腳本會檢查工具、檢查 repo 可見度（public）、fork + clone repo、啟用 Actions、建立兩個 environment，並印出下一步。
-拿到講師給的實際值之後，可以再帶參數執行一次補上 secrets／variables：
+只有在講師確認**你的 repository 已有專屬 OIDC federated credential 與 Azure RBAC**
+之後，才帶參數補上 secrets／variables：
 
 ```powershell
 .\setup-student-repo.ps1 -VmPublicIp <VM_PUBLIC_IP> -AzureResourceGroup <RG> -AzureVmName <VM> `
@@ -143,6 +145,22 @@ AZURE_CLIENT_ID=<ID> AZURE_TENANT_ID=<ID> AZURE_SUBSCRIPTION_ID=<ID> \
 ```
 
 腳本**不會**刪除任何東西、不會覆寫既有目錄、也不會硬編任何 token（一律使用你 `gh` 的既有登入狀態）。
+
+### Lab 04／05 的身分邊界（重要）
+
+OIDC federated credential 會精確綁定 GitHub repository 與 Environment。講師為
+`MoneyDemo/20260903-GH200` 建立的信任，**不會自動信任你的 fork**；只複製
+`AZURE_CLIENT_ID` 等三個 ID 到 fork 仍會得到 `AADSTS700213`。
+
+本課預設：
+
+- Lab 01–03、06：在自己的 fork 實作並執行。
+- Lab 04–05：學生先在 fork 寫完 YAML、由講師 review；實際 deployment 由講師在
+  class repo 示範，或讓已取得 class repo write access 的學員在指定 branch 操作。
+- 若客戶要求每位學員都部署：講師必須為**每一個 fork**建立精確的 federated
+  credential 並配置最小範圍 RBAC；setup script 不會也不應自動取得這項 Azure 權限。
+
+**不要把講師的 SSH private key、PAT 或長期 Azure client secret 發給學員作為替代方案。**
 
 ### `production` 的核准關卡要自己設
 

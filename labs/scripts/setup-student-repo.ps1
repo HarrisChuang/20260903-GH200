@@ -212,6 +212,10 @@ Set-RepoVariable -Name 'VM_PUBLIC_IP'          -Value $VmPublicIp
 Set-RepoVariable -Name 'AZURE_RESOURCE_GROUP'  -Value $AzureResourceGroup
 Set-RepoVariable -Name 'AZURE_VM_NAME'         -Value $AzureVmName
 
+if ($AzureClientId -or $AzureTenantId -or $AzureSubscriptionId) {
+    Write-Warn '設定 Azure IDs 不會自動建立 OIDC trust。講師仍必須為這個 fork 建立專屬 federated credential 與 RBAC。'
+}
+
 # ---------------------------------------------------------------------------
 # 8. 下一步
 # ---------------------------------------------------------------------------
@@ -226,11 +230,13 @@ Write-Host @"
          .\mvnw.cmd -B verify
      成功後應該會產生 target\simpleweb.jar
   3. 打開 labs\README.md，從 Lab 01 開始
-  4. 講師公布 VM public IP 與 Azure 資訊後，設成 repository variables：
+  4. 講師確認你的 fork 已有專屬 OIDC federated credential 與 RBAC 後，
+     才設定 Azure secrets／variables。只有 VM public IP 不代表你已取得 Azure 權限。
          gh variable set VM_PUBLIC_IP         --repo $myRepo --body "<VM_PUBLIC_IP>"
          gh variable set AZURE_RESOURCE_GROUP --repo $myRepo --body "<RG>"
          gh variable set AZURE_VM_NAME        --repo $myRepo --body "<VM>"
   5. Lab 05 之前，記得到 repo 設定 > Environments > production
      加上 required reviewer（把你自己加進去即可）
-  6. Lab 04／05 需要你的 repo 是 public（VM 要匿名下載 build-latest 的 release asset）
+  6. Lab 04／05 預設由講師在 class repo 實跑；fork 若沒有專屬 OIDC trust，
+     你仍要完成 YAML，但不要嘗試共用講師的私鑰或長期 client secret。
 "@ -ForegroundColor White

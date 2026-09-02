@@ -20,6 +20,10 @@
 
 ## 前置需求
 
+> **預設由講師實跑。** 你的 fork 必須有自己的 OIDC federated credential 與 Azure
+> RBAC 才能登入；講師 class repo 的 credential 不會套用到 fork。若未獲授權，請完成
+> YAML 並對照講師的實際 workflow log，不要要求或共用講師的長期密鑰。
+
 - 已完成 [Lab 03](lab03-package-artifact.md)
 - 你的 repo 已建立 GitHub Environment：**`test`**（`scripts/setup-student-repo.*` 會幫你建）
 - 你的 repo 是 **public**（VM 需要匿名下載 release asset；fork 課程 repo 預設就是 public）

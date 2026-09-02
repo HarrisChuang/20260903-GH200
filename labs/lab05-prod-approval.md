@@ -17,6 +17,10 @@
 
 ## 前置需求
 
+> **預設由講師實跑。** 只有 class repo（或已另建專屬 federated credential 的 fork）
+> 能使用本課 Azure OIDC 身分。你仍要自己完成 YAML，並觀察講師示範 run 在
+> `production` Environment 等待核准的過程。
+
 - 已完成 [Lab 04](lab04-deploy-test.md)，test 環境可以成功部署
 - 你的 repo 已建立 GitHub Environment：**`production`**，且已設定 **required reviewer**
   - `scripts/setup-student-repo.*` 會建立 environment，但**審核者需要你自己或講師指定**
