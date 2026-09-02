@@ -161,7 +161,7 @@ Write-Step '檢查 repo 可見度'
 $isPrivate = (& gh repo view $myRepo --json isPrivate --jq '.isPrivate').Trim()
 if ($isPrivate -eq 'true') {
     Write-Warn "$myRepo 目前是 private。"
-    Write-Warn 'Lab 04／05 的 VM 需要「匿名」下載 build-latest 的 release asset，'
+    Write-Warn 'Lab 04／05 的 VM 需要「匿名」下載 build-<commit-sha> 的 release asset，'
     Write-Warn '請把 repo 改成 public，或改用 Lab 04 附錄的 SSH 變體。'
     Write-Warn '（本腳本不會替你更動可見度，請自行到 repo 設定頁調整。）'
 }

@@ -5,7 +5,7 @@
 做完這個 lab，你應該可以：
 
 - 使用 `environment:` 把 job 綁定到 GitHub Environment，並在 Actions 頁面看到部署連結
-- 把建置產出發佈成 **rolling pre-release `build-latest`**，成為 VM 可以匿名取用的下載點
+- 把建置產出發佈成 **rolling pre-release `build-<commit-sha>`**，成為 VM 可以匿名取用的下載點
 - 說明 OIDC 與「把密碼存成 secret」的差別，以及為什麼 OIDC 比較安全
 - 正確設定 `permissions:`：workflow 層級最小、build job 提升為 `contents: write`、deploy job 只要 `id-token: write`
 - 用 `azure/login@v3` 以 OIDC 登入 Azure，完全不需要保存長期憑證
@@ -67,7 +67,7 @@ systemd unit 直接用 `Environment=` 設定 `SERVER_PORT` / `APP_ENVIRONMENT`�
    > 所以**絕對不要**把 `GITHUB_TOKEN` 或任何憑證傳給 VM。
 
    正確做法：讓 jar 變成一個**公開可匿名下載的 URL**，VM 只需要 `curl`，不需要任何身分。
-   我們用 GitHub Release 來做這件事——把 jar 發佈成一個固定 tag 的 **pre-release `build-latest`**，每次建置就覆蓋同一個 asset。
+   我們用 GitHub Release 來做這件事——把 jar 發佈成一個固定 tag 的 **pre-release `build-<commit-sha>`**，每次建置就覆蓋同一個 asset。
 
    | | workflow artifact（Lab 03） | release asset（本 lab） |
    |---|---|---|
@@ -82,12 +82,12 @@ systemd unit 直接用 `Environment=` 設定 `SERVER_PORT` / `APP_ENVIRONMENT`�
    - `build` job 加上 `permissions: contents: write`（建立／更新 release 需要）
    - 沿用 Lab 03 的 `upload-artifact`
    - 再加一個 step 發佈 release。`gh` CLI 在 GitHub 託管 runner 上已預裝，只要給它 `GH_TOKEN` 環境變數即可：
-     - 用 `gh release view build-latest` 判斷 release 是否已存在，不存在才 `gh release create ... --prerelease`
-     - 用 `gh release upload build-latest target/simpleweb.jar --clobber` 覆蓋既有 asset
+     - 用 `gh release view build-<commit-sha>` 判斷 release 是否已存在，不存在才 `gh release create ... --prerelease`
+     - 用 `gh release upload build-<commit-sha> target/simpleweb.jar --clobber` 覆蓋既有 asset
 
    **想一下：`--clobber` 是做什麼的？** 沒有它，第二次上傳同名 asset 會直接失敗。這就是「rolling tag」能持續運作的關鍵。
 
-   > 教學用的簡化：真實的正式環境會用**不可變的版本化 tag**（例如 `v1.4.2`）搭配保留歷史版本，才能精確回溯「上線的是哪一版」。`build-latest` 這種滾動 tag 只適合課堂與開發環境。
+   > 教學用的簡化：真實的正式環境會用**不可變的版本化 tag**（例如 `v1.4.2`）搭配保留歷史版本，才能精確回溯「上線的是哪一版」。`build-<commit-sha>` 這種滾動 tag 只適合課堂與開發環境。
 
 5. **建立 `deploy-test` job**，並補上：
    - `needs: build`
@@ -105,7 +105,7 @@ systemd unit 直接用 `Environment=` 設定 `SERVER_PORT` / `APP_ENVIRONMENT`�
 6. **Azure 登入。** 使用 `azure/login@v3`，在 `with:` 提供 `client-id` / `tenant-id` / `subscription-id`，值都從 `${{ secrets.* }}` 取得。
 
 7. **部署。** 用 `az vm run-command invoke` 在 VM 上執行一段 shell script。starter 已經把 VM 上要跑的 script 寫好給你（它做這些事）：
-   1. 匿名 `curl -fsSL` 下載 `build-latest` 的 `simpleweb.jar`（**沒有任何 Authorization header**）
+   1. 匿名 `curl -fsSL` 下載 `build-<commit-sha>` 的 `simpleweb.jar`（**沒有任何 Authorization header**）
    2. `unzip -tq` 驗證下載回來的是完整的 jar（下載到一半的檔案會在這裡就被擋下來）
    3. `install -m 0644 -o root -g root` 放到 `/opt/simpleweb/test/simpleweb.jar`
    4. **就地更新** `app.env`：先用 `sed` 刪掉舊的 `APP_BUILD_SHA` / `APP_BUILD_TIME`，再 append 新的
@@ -133,7 +133,7 @@ systemd unit 直接用 `Environment=` 設定 `SERVER_PORT` / `APP_ENVIRONMENT`�
    - `curl` 的 `-f` 參數很重要：沒有它，HTTP 500 也會被視為成功
 
 9. **Push 並觀察。** 在 run 頁面你應該看到：
-   - `build` job 完成後，repo 的 Releases 出現（或更新）標示為 pre-release 的 `build-latest`
+   - `build` job 完成後，repo 的 Releases 出現（或更新）標示為 pre-release 的 `build-<commit-sha>`
    - `deploy-test` job 上標示著 environment `test`
    - job 完成後出現指向 `http://<VM_PUBLIC_IP>:8080/` 的連結
 
@@ -158,7 +158,7 @@ jobs:
     steps:
       # （checkout / setup-java / mvnw verify 已提供）
       # TODO 2: upload-artifact@v7（名稱 simpleweb-jar）
-      # TODO 3: gh release create/upload build-latest --prerelease --clobber
+      # TODO 3: gh release create/upload build-<commit-sha> --prerelease --clobber
 
   deploy-test:
     runs-on: ubuntu-latest
@@ -169,13 +169,13 @@ jobs:
       # TODO 7: azure/login@v3（OIDC）
       # TODO 8: az vm run-command invoke
       #         補 --resource-group / --name / ENV_DIR / SERVICE
-      #         JAR_URL = .../releases/download/build-latest/simpleweb.jar
+      #         JAR_URL = .../releases/download/build-<commit-sha>/simpleweb.jar
       # TODO 9: smoke test /actuator/health，重試 12 次
 ```
 
 ## 驗收標準
 
-- [ ] `build` job 完成後，repo 的 Releases 中有 **`build-latest`**，標示為 **pre-release**，且附件是 `simpleweb.jar`
+- [ ] `build` job 完成後，repo 的 Releases 中有 **`build-<commit-sha>`**，標示為 **pre-release**，且附件是 `simpleweb.jar`
 - [ ] 你可以在**未登入**的瀏覽器（或無痕視窗）直接下載該 asset ——證明它是匿名可取用的
 - [ ] Actions run 中 `deploy-test` job 顯示**綠色勾勾**，且標示 environment `test`
 - [ ] `Azure login (OIDC)` step 成功，log 中沒有任何憑證明文

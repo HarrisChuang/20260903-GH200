@@ -9,11 +9,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: simpleweb-lab-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      # 建立／更新 build-latest 這個 rolling pre-release 需要寫入 contents。
+      # 建立／更新 build-${{ github.sha }} 這個 rolling pre-release 需要寫入 contents。
       contents: write
     steps:
       - uses: actions/checkout@v5
@@ -43,19 +47,19 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Publish jar to rolling pre-release build-latest
+      - name: Publish jar to rolling pre-release build-${{ github.sha }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if ! gh release view build-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create build-latest \
+          if ! gh release view build-${{ github.sha }} --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create build-${{ github.sha }} \
               --repo "$GITHUB_REPOSITORY" \
               --prerelease \
-              --title "build-latest" \
+              --title "build-${{ github.sha }}" \
               --notes "GH-200 lab 用的滾動式建置產出，由 workflow 自動更新。"
           fi
-          gh release upload build-latest \
+          gh release upload build-${{ github.sha }} \
             target/simpleweb.jar target/simpleweb.jar.sha256 \
             --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -87,8 +91,8 @@ jobs:
       - name: Deploy jar to VM and restart service
         env:
           # public repo 的 release asset 可匿名下載，因此不需要把任何 token 交給 VM。
-          JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
-          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
+          JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar
+          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar.sha256
         run: |
           set -euo pipefail
           OUT="$(az vm run-command invoke \
@@ -161,6 +165,6 @@ jobs:
             echo "- Service: \`simpleweb-test\`"
             echo "- URL: http://${{ vars.VM_PUBLIC_IP }}:8080/"
             echo "- Commit: \`${{ github.sha }}\`"
-            echo "- Jar 來源: \`build-latest\` release asset（匿名下載，未傳遞任何 token）"
+            echo "- Jar 來源: \`build-${{ github.sha }}\` release asset（匿名下載，未傳遞任何 token）"
             echo "- 完整性: \`sha256sum -c\` 於 VM 端驗證"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -26,9 +26,14 @@ on:
 permissions:
   contents: read
 
+# 與 Lab04 共用同一組，確保 test → production 的 artifact 不會被另一個 run 覆蓋。
+concurrency:
+  group: simpleweb-lab-deploy
+  cancel-in-progress: false
+
 jobs:
   # TODO 1: 把 Lab04 的 build job 原封不動搬過來
-  #   （含 contents: write、sha256 sidecar，以及發佈 build-latest 的步驟）
+  #   （含 contents: write、sha256 sidecar，以及發佈 build-${{ github.sha }} 的步驟）
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -56,17 +61,17 @@ jobs:
           path: target/simpleweb.jar
           if-no-files-found: error
           retention-days: 1
-      - name: Publish jar to rolling pre-release build-latest
+      - name: Publish jar to rolling pre-release build-${{ github.sha }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if ! gh release view build-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create build-latest --repo "$GITHUB_REPOSITORY" \
-              --prerelease --title "build-latest" \
+          if ! gh release view build-${{ github.sha }} --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create build-${{ github.sha }} --repo "$GITHUB_REPOSITORY" \
+              --prerelease --title "build-${{ github.sha }}" \
               --notes "GH-200 lab 用的滾動式建置產出。"
           fi
-          gh release upload build-latest \
+          gh release upload build-${{ github.sha }} \
             target/simpleweb.jar target/simpleweb.jar.sha256 \
             --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -105,7 +110,7 @@ jobs:
       #     ENV_DIR : test → ???
       #     SERVICE : simpleweb-test → ???
       #     port    : 8080 → ???
-      #   JAR_URL / SHA_URL 完全相同（都是 build-latest 這個 release asset）
+      #   JAR_URL / SHA_URL 完全相同（都是 build-${{ github.sha }} 這個 release asset）
       #   VM 端仍是 /bin/sh：`set -eu`，結尾 echo "DEPLOY_OK $SHA"
       #   app.env 一樣只更新 APP_BUILD_* 兩行，不要整份覆寫
       #   （加分：覆蓋前備份成 simpleweb.jar.previous）

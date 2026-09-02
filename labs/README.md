@@ -67,12 +67,12 @@ systemd unit 以 `Environment=` 固定 `SERVER_PORT` / `APP_ENVIRONMENT`，並�
 
 ### 交付路徑與信任邊界
 
-build job 會把 `target/simpleweb.jar` 發佈成一個固定 tag 的 pre-release **`build-latest`**
+build job 會把 `target/simpleweb.jar` 發佈成一個固定 tag 的 pre-release **`build-<commit-sha>`**
 （`gh release create` / `gh release upload --clobber`，需要 `contents: write`）。
 部署時只把**公開、匿名可下載**的 asset URL 傳給 VM：
 
 ```
-https://github.com/<owner>/<repo>/releases/download/build-latest/simpleweb.jar
+https://github.com/<owner>/<repo>/releases/download/build-<commit-sha>/simpleweb.jar
 ```
 
 > 🔒 **原則：絕對不要把 `GITHUB_TOKEN` 或任何憑證傳給 VM 或 `az vm run-command --parameters`。**

@@ -27,7 +27,7 @@
   - 課堂做法：把你自己設為 reviewer，這樣你可以自己按核准，體驗完整流程
 - Secrets（`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`）與
   variables（`AZURE_RESOURCE_GROUP` / `AZURE_VM_NAME` / `VM_PUBLIC_IP`）同 Lab 04
-- repo 為 **public**（VM 需要匿名下載 `build-latest` 的 release asset）
+- repo 為 **public**（VM 需要匿名下載 `build-<commit-sha>` 的 release asset）
 
 > ⚠️ VM 的 public IP 一律以 `<VM_PUBLIC_IP>` / `${{ vars.VM_PUBLIC_IP }}` 表示，講師會在課堂上給實際值。
 
@@ -52,7 +52,7 @@
    | port | 8080 | 8081 |
 
    `permissions:`（`contents: read` + `id-token: write`）與 `azure/login@v3` 的寫法完全相同，
-   `JAR_URL` 也完全相同——兩個環境部署的都是 `build-latest` 這個 release asset 上的**同一個 jar**。
+   `JAR_URL` 也完全相同——兩個環境部署的都是 `build-<commit-sha>` 這個 release asset 上的**同一個 jar**。
    這正是「promote（晉升）」的意思：**不重新建置，把已經在 test 驗證過的那一份原封不動送上 production。**
    重新 build 一次會產出不同的二進位檔，等於 test 驗證的東西和上線的東西不是同一個。
 
@@ -97,7 +97,7 @@ Starter：[`starters/lab05.yml`](starters/lab05.yml)
 
 ```yaml
 jobs:
-  build:        # 沿用 Lab04（contents: write + 發佈 build-latest）
+  build:        # 沿用 Lab04（contents: write + 發佈 build-<commit-sha>）
   deploy-test:  # 沿用 Lab04
 
   deploy-prod:
@@ -109,7 +109,7 @@ jobs:
       # TODO 3d: azure/login@v3
       # TODO 3e: az vm run-command invoke
       #          ENV_DIR = prod / SERVICE = simpleweb-prod
-      #          JAR_URL 與 deploy-test 完全相同（同一個 build-latest asset）
+      #          JAR_URL 與 deploy-test 完全相同（同一個 build-<commit-sha> asset）
       #          app.env 一樣只更新 APP_BUILD_* 兩行，不要整份覆寫
       #          （加分：覆蓋前備份成 simpleweb.jar.previous）
       # TODO 3f: smoke test :8081/actuator/health
@@ -126,7 +126,7 @@ jobs:
 - [ ] `az vm run-command` 的參數中**沒有任何 token**（只有公開 URL、`prod`、`simpleweb-prod`、SHA）
 - [ ] `production` environment 的部署歷史中有這一筆紀錄，含核准者
 - [ ] 你能說出：為什麼保護規則設在 environment 而不是寫在 YAML 裡
-- [ ] 你能說出：為什麼 deploy-prod 不重新 build，而是部署同一個 `build-latest` asset
+- [ ] 你能說出：為什麼 deploy-prod 不重新 build，而是部署同一個 `build-<commit-sha>` asset
 
 ## 常見錯誤
 
@@ -142,7 +142,7 @@ jobs:
 | 重啟了 `simpleweb-test` 卻說是上 prod | service 名稱沒改 | `SERVICE` 要填 `simpleweb-prod` |
 | prod 顯示 environment = test | 部署到了 test 目錄/service，或 systemd prod unit 的 `Environment=APP_ENVIRONMENT=production` 錯誤 | 檢查目標目錄、service 名稱與 unit |
 | `Resource group 'null' could not be found` | 用了舊變數名 `VM_RESOURCE_GROUP` / `VM_NAME` | 正確名稱是 `AZURE_RESOURCE_GROUP` / `AZURE_VM_NAME` |
-| VM 上 `curl` 下載 jar 回 404 | build job 沒跑過，或 repo 是 private | 確認 `build-latest` 存在且 repo 為 public |
+| VM 上 `curl` 下載 jar 回 404 | build job 沒跑過，或 repo 是 private | 確認 `build-<commit-sha>` 存在且 repo 為 public |
 | smoke test 打 8080 都過，8081 不通 | port 沒改，或 prod 服務沒起來 | 檢查 `systemctl is-active simpleweb-prod` 的輸出 |
 | 抓不到 environment secret | job 沒寫 `environment:` | 只有綁定 environment 的 job 才拿得到 |
 | 等待核准時擔心在燒分鐘數 | 誤解 | 等待期間沒有 runner 被佔用 |

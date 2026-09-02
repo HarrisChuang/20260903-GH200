@@ -35,6 +35,11 @@ on:
 permissions:
   contents: read
 
+# Lab04 與 Lab05 共用同一組，避免兩個 deployment 同時改 VM。
+concurrency:
+  group: simpleweb-lab-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -67,21 +72,21 @@ jobs:
       # TODO 3: 沿用 Lab03 的做法，把 target/simpleweb.jar 上傳成 workflow artifact
       #   （actions/upload-artifact@v7，名稱 simpleweb-jar；給人下載除錯用）
 
-      # TODO 4: 把 jar 與 checksum 一起發佈成 rolling pre-release `build-latest`
+      # TODO 4: 把 jar 與 checksum 一起發佈成 rolling pre-release `build-${{ github.sha }}`
       #   gh CLI 在 GitHub 託管 runner 上已預裝，只要提供 GH_TOKEN 即可。
       #
       #   env:
       #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #   run: |
       #     set -euo pipefail
-      #     if ! gh release view build-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-      #       gh release create build-latest \
+      #     if ! gh release view build-${{ github.sha }} --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+      #       gh release create build-${{ github.sha }} \
       #         --repo "$GITHUB_REPOSITORY" \
       #         --prerelease \
-      #         --title "build-latest" \
+      #         --title "build-${{ github.sha }}" \
       #         --notes "GH-200 lab 用的滾動式建置產出。"
       #     fi
-      #     gh release upload build-latest \
+      #     gh release upload build-${{ github.sha }} \
       #       target/simpleweb.jar target/simpleweb.jar.sha256 \
       #       --repo "$GITHUB_REPOSITORY" --clobber
       #
@@ -125,8 +130,8 @@ jobs:
       #   你要補的是 --resource-group / --name / --parameters 這幾行。
       #
       #   env:
-      #     JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
-      #     SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
+      #     JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar
+      #     SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar.sha256
       #   run: |
       #     set -euo pipefail
       #     OUT="$(az vm run-command invoke \

@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: simpleweb-lab-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -41,19 +45,19 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Publish jar to rolling pre-release build-latest
+      - name: Publish jar to rolling pre-release build-${{ github.sha }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if ! gh release view build-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create build-latest \
+          if ! gh release view build-${{ github.sha }} --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create build-${{ github.sha }} \
               --repo "$GITHUB_REPOSITORY" \
               --prerelease \
-              --title "build-latest" \
+              --title "build-${{ github.sha }}" \
               --notes "GH-200 lab 用的滾動式建置產出，由 workflow 自動更新。"
           fi
-          gh release upload build-latest \
+          gh release upload build-${{ github.sha }} \
             target/simpleweb.jar target/simpleweb.jar.sha256 \
             --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -82,8 +86,8 @@ jobs:
 
       - name: Deploy to test
         env:
-          JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
-          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
+          JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar
+          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar.sha256
         run: |
           set -euo pipefail
           OUT="$(az vm run-command invoke \
@@ -167,8 +171,8 @@ jobs:
 
       - name: Deploy to production
         env:
-          JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
-          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
+          JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar
+          SHA_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.sha }}/simpleweb.jar.sha256
         run: |
           set -euo pipefail
           OUT="$(az vm run-command invoke \
