@@ -60,6 +60,13 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # 共享課程訂閱可能有外部 auto-shutdown；部署前先確保 VM 正在執行。
+      - name: Ensure VM is running
+        run: |
+          az vm start \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_VM_NAME }}"
+
       - name: Deploy to test VM
         env:
           JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
@@ -69,7 +76,7 @@ jobs:
             --name "${{ vars.AZURE_VM_NAME }}" \
             --command-id RunShellScript \
             --scripts "
-              set -euo pipefail
+              set -eu
               curl -fsSL --retry 3 -o /tmp/simpleweb.jar '$JAR_URL'
               install -o simpleweb -g simpleweb -m 0644 /tmp/simpleweb.jar /opt/simpleweb/test/simpleweb.jar
               printf 'APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n' '${{ github.sha }}' \"\$(date -u +%FT%TZ)\" > /opt/simpleweb/test/app.env
@@ -91,3 +98,4 @@ jobs:
           done
           echo "應用程式在時間內沒有回應" >&2
           exit 1
+
