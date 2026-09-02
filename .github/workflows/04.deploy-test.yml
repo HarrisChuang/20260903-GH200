@@ -48,9 +48,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          printf '%s\n' "$GITHUB_SHA" > build-sha.txt
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 \
             || gh release create "$RELEASE_TAG" --prerelease --title "Rolling build" --notes "由 CI 自動更新的最新可部署版本"
-          gh release upload "$RELEASE_TAG" target/simpleweb.jar --clobber
+          gh release upload "$RELEASE_TAG" target/simpleweb.jar build-sha.txt --clobber
 
       # 使用 OIDC 登入 Azure（沒有任何長期密碼存在 GitHub）
       - name: Azure login (OIDC)
@@ -71,7 +72,7 @@ jobs:
         env:
           JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
         run: |
-          az vm run-command invoke \
+          output="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}" \
             --command-id RunShellScript \
@@ -83,19 +84,25 @@ jobs:
               systemctl restart simpleweb-test
               sleep 5
               systemctl is-active simpleweb-test
+              echo DEPLOY_OK
             " \
-            --query "value[0].message" -o tsv
+            --query "value[0].message" -o tsv)"
+          echo "$output"
+          printf '%s' "$output" | grep -q DEPLOY_OK
 
       # 部署完一定要驗證，不要只看 workflow 綠燈就當成功
       - name: Smoke test
         run: |
+          body=''
           for i in $(seq 1 10); do
-            if curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8080/api/info"; then
+            body="$(curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8080/api/info" || true)"
+            if printf '%s' "$body" | grep -q "${{ github.sha }}"; then
+              echo "$body"
               echo "" && echo "測試環境部署成功"
               exit 0
             fi
             echo "等待應用程式啟動... ($i/10)" && sleep 6
           done
-          echo "應用程式在時間內沒有回應" >&2
+          echo "應用程式在時間內沒有回報這次 commit" >&2
+          echo "最後回應：$body" >&2
           exit 1
-

@@ -41,6 +41,11 @@ jobs:
       url: http://${{ vars.VM_PUBLIC_IP }}:8081
 
     steps:
+      - name: Resolve promoted build SHA
+        env:
+          SHA_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/build-sha.txt
+        run: echo "EXPECTED_SHA=$(curl -fsSL "$SHA_URL")" >> "$GITHUB_ENV"
+
       - name: Azure login (OIDC)
         uses: azure/login@v3
         with:
@@ -60,7 +65,7 @@ jobs:
         env:
           JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
         run: |
-          az vm run-command invoke \
+          output="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}" \
             --command-id RunShellScript \
@@ -68,22 +73,28 @@ jobs:
               set -eu
               curl -fsSL --retry 3 -o /tmp/simpleweb.jar '$JAR_URL'
               install -o simpleweb -g simpleweb -m 0644 /tmp/simpleweb.jar /opt/simpleweb/prod/simpleweb.jar
-              printf 'APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n' '${{ github.sha }}' \"\$(date -u +%FT%TZ)\" > /opt/simpleweb/prod/app.env
+              printf 'APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n' '$EXPECTED_SHA' \"\$(date -u +%FT%TZ)\" > /opt/simpleweb/prod/app.env
               systemctl restart simpleweb-prod
               sleep 5
               systemctl is-active simpleweb-prod
+              echo DEPLOY_OK
             " \
-            --query "value[0].message" -o tsv
+            --query "value[0].message" -o tsv)"
+          echo "$output"
+          printf '%s' "$output" | grep -q DEPLOY_OK
 
       - name: Smoke test
         run: |
+          body=''
           for i in $(seq 1 10); do
-            if curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8081/api/info"; then
+            body="$(curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8081/api/info" || true)"
+            if printf '%s' "$body" | grep -q "$EXPECTED_SHA"; then
+              echo "$body"
               echo "" && echo "正式環境部署成功"
               exit 0
             fi
             echo "等待應用程式啟動... ($i/10)" && sleep 6
           done
-          echo "應用程式在時間內沒有回應" >&2
+          echo "應用程式在時間內沒有回報 promoted build SHA：$EXPECTED_SHA" >&2
+          echo "最後回應：$body" >&2
           exit 1
-

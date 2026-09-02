@@ -73,9 +73,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          printf '%s\n' "$GITHUB_SHA" > ./dist/build-sha.txt
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 \
             || gh release create "$RELEASE_TAG" --prerelease --title "Rolling build" --notes "由 CI 自動更新的最新可部署版本"
-          gh release upload "$RELEASE_TAG" ./dist/simpleweb.jar --clobber
+          gh release upload "$RELEASE_TAG" ./dist/simpleweb.jar ./dist/build-sha.txt --clobber
 
   # ---------- 3. Deploy 到測試環境（自動） ----------
   deploy-test:
@@ -103,7 +104,7 @@ jobs:
         env:
           JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
         run: |
-          az vm run-command invoke \
+          output="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}" \
             --command-id RunShellScript \
@@ -115,15 +116,21 @@ jobs:
               systemctl restart simpleweb-test
               sleep 5
               systemctl is-active simpleweb-test
+              echo DEPLOY_OK
             " \
-            --query "value[0].message" -o tsv
+            --query "value[0].message" -o tsv)"
+          echo "$output"
+          printf '%s' "$output" | grep -q DEPLOY_OK
 
       - name: Smoke test
         run: |
+          body=''
           for i in $(seq 1 10); do
-            curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8080/api/info" && exit 0
+            body="$(curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8080/api/info" || true)"
+            printf '%s' "$body" | grep -q "${{ github.sha }}" && { echo "$body"; exit 0; }
             echo "等待應用程式啟動... ($i/10)" && sleep 6
           done
+          echo "最後回應：$body" >&2
           exit 1
 
   # ---------- 4. Deploy 到正式環境（需人工核准） ----------
@@ -153,7 +160,7 @@ jobs:
         env:
           JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
         run: |
-          az vm run-command invoke \
+          output="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --name "${{ vars.AZURE_VM_NAME }}" \
             --command-id RunShellScript \
@@ -165,15 +172,21 @@ jobs:
               systemctl restart simpleweb-prod
               sleep 5
               systemctl is-active simpleweb-prod
+              echo DEPLOY_OK
             " \
-            --query "value[0].message" -o tsv
+            --query "value[0].message" -o tsv)"
+          echo "$output"
+          printf '%s' "$output" | grep -q DEPLOY_OK
 
       - name: Smoke test
         run: |
+          body=''
           for i in $(seq 1 10); do
-            curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8081/api/info" && exit 0
+            body="$(curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8081/api/info" || true)"
+            printf '%s' "$body" | grep -q "${{ github.sha }}" && { echo "$body"; exit 0; }
             echo "等待應用程式啟動... ($i/10)" && sleep 6
           done
+          echo "最後回應：$body" >&2
           exit 1
 
       - name: Write job summary
@@ -188,4 +201,3 @@ jobs:
             echo ""
             echo "版本：\`${{ needs.build.outputs.sha_short }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-
