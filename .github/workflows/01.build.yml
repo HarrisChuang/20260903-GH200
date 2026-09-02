@@ -11,6 +11,12 @@ name: 01.build
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'mvnw'
+      - '.mvn/**'
+      - '.github/workflows/01.build.yml'
   # workflow_dispatch 讓你可以在 Actions 頁面按按鈕手動執行，
   # 上課時非常好用：不用一直亂 push commit 就能重跑。
   workflow_dispatch:
@@ -39,3 +45,4 @@ jobs:
       # 用 Maven Wrapper (./mvnw)，所以 runner 不需要事先安裝 Maven
       - name: Compile
         run: ./mvnw -B compile
+

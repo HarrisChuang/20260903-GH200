@@ -11,6 +11,12 @@ name: 02.build-test
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'mvnw'
+      - '.mvn/**'
+      - '.github/workflows/02.build-test.yml'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -58,4 +64,5 @@ jobs:
             echo "| 觸發事件 | \`${GITHUB_EVENT_NAME}\` |"
             echo "| 結果 | ${{ job.status }} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
 

@@ -14,6 +14,12 @@ name: 03.package-artifact
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'mvnw'
+      - '.mvn/**'
+      - '.github/workflows/03.package-artifact.yml'
   workflow_dispatch:
 
 permissions:
@@ -68,4 +74,5 @@ jobs:
             echo "- 大小：$(du -h ./dist/simpleweb.jar | cut -f1)"
             echo "- 來源 commit：\`${GITHUB_SHA:0:7}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
 
