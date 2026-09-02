@@ -117,7 +117,7 @@ step "啟用 GitHub Actions"
 
 gh api --method PUT "repos/$MY_REPO/actions/permissions" \
   -H "Accept: application/vnd.github+json" \
-  -f enabled=true -f allowed_actions=all >/dev/null \
+  -F enabled=true -f allowed_actions=all >/dev/null \
   || die "Actions 啟用失敗，請確認你對該 repo 有 admin 權限。"
 ok "Actions 已啟用"
 
@@ -157,7 +157,7 @@ step "設定 secrets 與 variables（沒填的會跳過）"
 set_secret() {
   local name="$1" value="$2"
   if [ -z "$value" ]; then warn "secret $name 未提供，跳過"; return 0; fi
-  printf '%s' "$value" | gh secret set "$name" --repo "$MY_REPO" --body - \
+  printf '%s' "$value" | gh secret set "$name" --repo "$MY_REPO" \
     || die "設定 secret $name 失敗。"
   ok "secret $name 已設定"
 }

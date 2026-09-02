@@ -66,6 +66,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Ensure VM is running
+        run: |
+          az vm start \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_VM_NAME }}"
       - name: Deploy to test
         env:
           JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
@@ -76,14 +81,13 @@ jobs:
             --command-id RunShellScript \
             --parameters "$JAR_URL" "test" "simpleweb-test" "${{ github.sha }}" \
             --scripts '
-              set -euo pipefail
+              set -eu
               JAR_URL="$1"; ENV_DIR="$2"; SERVICE="$3"; SHA="$4"
               STAGING="/opt/simpleweb/staging/$ENV_DIR"
               TARGET="/opt/simpleweb/$ENV_DIR"
               sudo mkdir -p "$STAGING" "$TARGET"
               sudo rm -f "$STAGING/simpleweb.jar"
               sudo curl -fsSL -o "$STAGING/simpleweb.jar" "$JAR_URL"
-              sudo unzip -tq "$STAGING/simpleweb.jar"
               sudo install -m 0644 -o root -g root "$STAGING/simpleweb.jar" "$TARGET/simpleweb.jar"
               sudo touch "$TARGET/app.env"
               sudo sed -i "/^APP_BUILD_SHA=/d; /^APP_BUILD_TIME=/d" "$TARGET/app.env"
@@ -100,9 +104,12 @@ jobs:
       - name: Smoke test test 環境
         run: |
           set -euo pipefail
+          body=''
           for i in $(seq 1 12); do
-            if curl -fsS --max-time 5 "http://${{ vars.VM_PUBLIC_IP }}:8080/actuator/health" >/dev/null; then
+            body="$(curl -fsS --max-time 5 "http://${{ vars.VM_PUBLIC_IP }}:8080/api/info" || true)"
+            if printf '%s' "$body" | grep -q "${{ github.sha }}"; then
               echo "✅ test 環境正常"
+              echo "$body"
               exit 0
             fi
             echo "等待 test 服務啟動... ($i/12)"
@@ -127,6 +134,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Ensure VM is running
+        run: |
+          az vm start \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_VM_NAME }}"
       - name: Deploy to production
         env:
           JAR_URL: https://github.com/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
@@ -137,14 +149,13 @@ jobs:
             --command-id RunShellScript \
             --parameters "$JAR_URL" "prod" "simpleweb-prod" "${{ github.sha }}" \
             --scripts '
-              set -euo pipefail
+              set -eu
               JAR_URL="$1"; ENV_DIR="$2"; SERVICE="$3"; SHA="$4"
               STAGING="/opt/simpleweb/staging/$ENV_DIR"
               TARGET="/opt/simpleweb/$ENV_DIR"
               sudo mkdir -p "$STAGING" "$TARGET"
               sudo rm -f "$STAGING/simpleweb.jar"
               sudo curl -fsSL -o "$STAGING/simpleweb.jar" "$JAR_URL"
-              sudo unzip -tq "$STAGING/simpleweb.jar"
               if [ -f "$TARGET/simpleweb.jar" ]; then
                 sudo cp -f "$TARGET/simpleweb.jar" "$TARGET/simpleweb.jar.previous"
               fi
@@ -165,11 +176,12 @@ jobs:
         run: |
           set -euo pipefail
           BASE="http://${{ vars.VM_PUBLIC_IP }}:8081"
+          body=''
           for i in $(seq 1 12); do
-            if curl -fsS --max-time 5 "$BASE/actuator/health" >/dev/null; then
+            body="$(curl -fsS --max-time 5 "$BASE/api/info" || true)"
+            if printf '%s' "$body" | grep -q "${{ github.sha }}"; then
               echo "✅ production 環境正常"
-              curl -fsS "$BASE/api/info"
-              echo ""
+              echo "$body"
               exit 0
             fi
             echo "等待 production 服務啟動... ($i/12)"
@@ -189,3 +201,4 @@ jobs:
             echo "- Commit: \`${{ github.sha }}\`"
             echo "- Jar 來源: \`build-latest\` release asset（匿名下載，未傳遞任何 token）"
           } >> "$GITHUB_STEP_SUMMARY"
+

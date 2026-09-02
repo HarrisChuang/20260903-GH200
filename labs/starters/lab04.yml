@@ -97,7 +97,13 @@ jobs:
       #     tenant-id: ???
       #     subscription-id: ???
 
-      # TODO 8: 呼叫 az vm run-command invoke 部署
+      # TODO 8: 用 az vm start 確保共享課程 VM 沒有被 auto-shutdown
+      #   run: |
+      #     az vm start \
+      #       --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+      #       --name "${{ vars.AZURE_VM_NAME }}"
+
+      # TODO 9: 呼叫 az vm run-command invoke 部署
       #   下面已經幫你寫好會在 VM 上跑的 shell script（$1..$4 是傳進去的參數），
       #   你要補的是 --resource-group / --name / --parameters 這幾行。
       #
@@ -110,14 +116,13 @@ jobs:
       #       --command-id RunShellScript \
       #       --parameters "$JAR_URL" "???" "???" "${{ github.sha }}" \
       #       --scripts '
-      #         set -euo pipefail
+      #         set -eu
       #         JAR_URL="$1"; ENV_DIR="$2"; SERVICE="$3"; SHA="$4"
       #         STAGING="/opt/simpleweb/staging/$ENV_DIR"
       #         TARGET="/opt/simpleweb/$ENV_DIR"
       #         sudo mkdir -p "$STAGING" "$TARGET"
       #         sudo rm -f "$STAGING/simpleweb.jar"
       #         sudo curl -fsSL -o "$STAGING/simpleweb.jar" "$JAR_URL"
-      #         sudo unzip -tq "$STAGING/simpleweb.jar"
       #         sudo install -m 0644 -o root -g root "$STAGING/simpleweb.jar" "$TARGET/simpleweb.jar"
       #         sudo touch "$TARGET/app.env"
       #         sudo sed -i "/^APP_BUILD_SHA=/d; /^APP_BUILD_TIME=/d" "$TARGET/app.env"

@@ -45,7 +45,7 @@
 | 建置指令 | `./mvnw -B verify`（Windows 本機：`.\mvnw.cmd -B verify`） |
 | 建置產出 | **`target/simpleweb.jar`**（固定，永遠是這個檔名） |
 | 端點 | `/`（HTML，顯示 environment / build SHA / hostname）、`/api/info`（JSON）、`/actuator/health` |
-| 執行期環境變數 | `SERVER_PORT`、`APP_ENVIRONMENT`、`APP_BUILD_SHA`、`APP_BUILD_TIME`（systemd 由 `/opt/simpleweb/{env}/app.env` 讀取） |
+| 執行期環境變數 | systemd unit 直接設定 `SERVER_PORT` / `APP_ENVIRONMENT`；`app.env` 提供 `APP_BUILD_SHA` / `APP_BUILD_TIME` |
 
 > **Maven Wrapper 已經 commit 在 repo 裡，你的機器不需要安裝 Maven。**
 > 但你**需要** JDK 21。
@@ -59,8 +59,9 @@
 | 測試 | `simpleweb-test` | **8080** | `/opt/simpleweb/test/simpleweb.jar` | `/opt/simpleweb/test/app.env` | `test` |
 | 正式 | `simpleweb-prod` | **8081** | `/opt/simpleweb/prod/simpleweb.jar` | `/opt/simpleweb/prod/app.env` | `production`（有**核准關卡**） |
 
-systemd unit 由 **`app.env`** 讀取執行期環境變數，該檔須為 `root:root` / `0644`。
-部署時**只更新** `APP_BUILD_SHA` / `APP_BUILD_TIME` 兩行，保留既有的 `SERVER_PORT` / `APP_ENVIRONMENT`。
+systemd unit 以 `Environment=` 固定 `SERVER_PORT` / `APP_ENVIRONMENT`，並透過
+**`app.env`** 讀取 build metadata。該檔須可被 service 讀取（本課使用
+`root:root` / `0644`）。部署只負責 `APP_BUILD_SHA` / `APP_BUILD_TIME`。
 
 部署方式：`azure/login@v3` 以 **OIDC** 登入，再用 `az vm run-command invoke` 操作 VM。
 
@@ -248,6 +249,6 @@ labs/
 - Azure 端的 federated credential 需涵蓋每位學員 repo 的 `test` 與 `production` environment
 - VM 的網路安全群組需要開放 **8080** 與 **8081**
 - VM 需能對外連到 `github.com` 下載 release asset；學員的 fork 需維持 **public**
-- 兩個 systemd unit 需以 `EnvironmentFile` 指向 `/opt/simpleweb/{test,prod}/app.env`，
-  且該檔預先寫好 `SERVER_PORT` 與 `APP_ENVIRONMENT`（部署腳本只會覆蓋 `APP_BUILD_*` 兩行）
+- 兩個 systemd unit 需直接設定各自的 `SERVER_PORT` / `APP_ENVIRONMENT`，並以
+  `EnvironmentFile` 指向 `/opt/simpleweb/{test,prod}/app.env` 讀取 `APP_BUILD_*`
 - Lab 07 若要實作，需提供 VM 的 SSH 連線方式

@@ -85,7 +85,9 @@ jobs:
     steps:
       # TODO 3d: azure/login@v3（OIDC，同 Lab04）
 
-      # TODO 3e: az vm run-command invoke
+      # TODO 3e: 先用 az vm start 確保 VM 正在執行（同 Lab04）
+
+      # TODO 3f: az vm run-command invoke
       #   與 Lab04 幾乎相同，只有三個地方要改：
       #     ENV_DIR : test → ???
       #     SERVICE : simpleweb-test → ???

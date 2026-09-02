@@ -145,7 +145,7 @@ Write-Step '啟用 GitHub Actions'
 
 & gh api --method PUT "repos/$myRepo/actions/permissions" `
     -H 'Accept: application/vnd.github+json' `
-    -f enabled=true -f allowed_actions=all | Out-Null
+    -F enabled=true -f allowed_actions=all | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Actions 啟用失敗，請確認你對該 repo 有 admin 權限。' }
 Write-Ok 'Actions 已啟用'
 
@@ -189,7 +189,7 @@ function Set-RepoSecret {
         Write-Warn "secret $Name 未提供，跳過"
         return
     }
-    $Value | & gh secret set $Name --repo $myRepo --body -
+    $Value | & gh secret set $Name --repo $myRepo
     if ($LASTEXITCODE -ne 0) { throw "設定 secret $Name 失敗。" }
     Write-Ok "secret $Name 已設定"
 }

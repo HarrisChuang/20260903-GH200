@@ -45,8 +45,9 @@
 | test | `simpleweb-test` | 8080 | `/opt/simpleweb/test/simpleweb.jar` | `/opt/simpleweb/test/app.env` |
 | production | `simpleweb-prod` | 8081 | `/opt/simpleweb/prod/simpleweb.jar` | `/opt/simpleweb/prod/app.env` |
 
-systemd unit 透過 **`app.env`** 讀取 `SERVER_PORT`、`APP_ENVIRONMENT`、`APP_BUILD_SHA`、`APP_BUILD_TIME`。
-這個檔案必須由 root 擁有且可讀（`root:root`、`0644`），systemd 才讀得到。
+systemd unit 直接用 `Environment=` 設定 `SERVER_PORT` / `APP_ENVIRONMENT`，再透過
+**`app.env`** 讀取 `APP_BUILD_SHA` / `APP_BUILD_TIME`。這個檔案必須可被 service
+讀取（本課使用 `root:root`、`0644`）。
 
 ## 步驟
 
@@ -120,10 +121,10 @@ systemd unit 透過 **`app.env`** 讀取 `SERVER_PORT`、`APP_ENVIRONMENT`、`AP
    `az vm run-command invoke --command-id RunShellScript` 的 `--parameters` 會依序變成 script 裡的 `$1 $2 $3 ...`。
    本 lab 傳進去的四個值 —— jar 的公開 URL、環境目錄、服務名稱、commit SHA —— **全部都是非機密資訊**，這是刻意的設計。
 
-   > **為什麼是 `sed` + append，不是直接覆寫 `app.env`？**
-   > 因為 `app.env` 裡還有講師佈署時寫入的 `SERVER_PORT` 與 `APP_ENVIRONMENT`。
-   > 整份覆寫會把它們洗掉，服務就會用錯 port 或顯示錯誤的環境名稱。
-   > 「只更新我負責的那幾行」是操作既有設定檔的基本紀律。
+   > **為什麼練習使用 `sed` + append？**
+   > 本課的 `app.env` 目前只放 `APP_BUILD_*`，直接覆寫也能運作；這裡刻意練習
+   > 「只更新自己負責的設定」這個通用操作紀律。Port 與 environment 由 systemd
+   > unit 的 `Environment=` 固定，不受此檔覆寫影響。
 
 8. **Smoke test。** 部署完不要相信「綠色 = 成功」，一定要實際打一次服務：
    - 對 `http://${{ vars.VM_PUBLIC_IP }}:8080/actuator/health` 做 `curl -fsS`
@@ -197,7 +198,7 @@ jobs:
 | `AADSTS70021: No matching federated identity record found` | Azure 端的 federated credential 沒有涵蓋你的 repo／environment | 請講師確認設定；確認 `environment: test` 名稱完全一致 |
 | `Resource group 'null' could not be found` | `vars.AZURE_RESOURCE_GROUP` 沒設定（未定義的 vars 會變成空字串） | 到 repo 的 Variables 設定補上 |
 | 變數名稱找不到 | 用了舊名稱 `VM_RESOURCE_GROUP` / `VM_NAME` | 正確名稱是 `AZURE_RESOURCE_GROUP` / `AZURE_VM_NAME` |
-| 服務重啟後 port 或 environment 跑掉 | 整份覆寫了 `app.env`，洗掉 `SERVER_PORT` / `APP_ENVIRONMENT` | 只用 `sed` 刪掉 `APP_BUILD_*` 再 append |
+| Build SHA 仍是舊值 | `app.env` 沒更新，或 service 沒 restart | 檢查 `APP_BUILD_*` 並讀 `journalctl -u simpleweb-test` |
 | 服務起不來，`journalctl` 顯示讀不到環境變數檔 | `app.env` 權限或擁有者不對 | `chown root:root` + `chmod 0644` |
 | `systemctl restart` 失敗 permission denied | script 沒有用 `sudo` | 確認 script 內的指令都有 `sudo` |
 | smoke test 一直失敗但服務其實有起來 | 網路安全群組沒開 8080，或 IP 填錯 | 確認 `VM_PUBLIC_IP`；請講師確認 NSG |

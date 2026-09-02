@@ -136,7 +136,7 @@ jobs:
 | 核准按鈕沒出現／按不下去 | 你不在 reviewer 名單裡 | 把自己加進 required reviewers |
 | 部署到了 `/opt/simpleweb/production/` | `ENV_DIR` 填成 `production` | 目錄是 `prod`，environment 名稱才是 `production` |
 | 重啟了 `simpleweb-test` 卻說是上 prod | service 名稱沒改 | `SERVICE` 要填 `simpleweb-prod` |
-| prod 服務起來了但顯示 environment = test | 整份覆寫了 `/opt/simpleweb/prod/app.env`，洗掉 `APP_ENVIRONMENT` | 只用 `sed` 刪掉 `APP_BUILD_*` 再 append |
+| prod 顯示 environment = test | 部署到了 test 目錄/service，或 systemd prod unit 的 `Environment=APP_ENVIRONMENT=production` 錯誤 | 檢查目標目錄、service 名稱與 unit |
 | `Resource group 'null' could not be found` | 用了舊變數名 `VM_RESOURCE_GROUP` / `VM_NAME` | 正確名稱是 `AZURE_RESOURCE_GROUP` / `AZURE_VM_NAME` |
 | VM 上 `curl` 下載 jar 回 404 | build job 沒跑過，或 repo 是 private | 確認 `build-latest` 存在且 repo 為 public |
 | smoke test 打 8080 都過，8081 不通 | port 沒改，或 prod 服務沒起來 | 檢查 `systemctl is-active simpleweb-prod` 的輸出 |
