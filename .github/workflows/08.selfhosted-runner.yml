@@ -54,4 +54,12 @@ jobs:
           sudo systemctl is-active simpleweb-test
 
       - name: Smoke test
-        run: curl -fsS http://localhost:8080/api/info
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS http://localhost:8080/api/info; then
+              exit 0
+            fi
+            echo "等待 Spring Boot 啟動... ($i/12)"
+            sleep 5
+          done
+          exit 1
