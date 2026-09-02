@@ -49,9 +49,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           printf '%s\n' "$GITHUB_SHA" > build-sha.txt
+          sha256sum target/simpleweb.jar | awk '{print $1 "  simpleweb.jar"}' > simpleweb.jar.sha256
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 \
             || gh release create "$RELEASE_TAG" --prerelease --title "Rolling build" --notes "由 CI 自動更新的最新可部署版本"
-          gh release upload "$RELEASE_TAG" target/simpleweb.jar build-sha.txt --clobber
+          gh release upload "$RELEASE_TAG" target/simpleweb.jar build-sha.txt simpleweb.jar.sha256 --clobber
 
       # 使用 OIDC 登入 Azure（沒有任何長期密碼存在 GitHub）
       - name: Azure login (OIDC)
@@ -71,6 +72,7 @@ jobs:
       - name: Deploy to test VM
         env:
           JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
+          DIGEST_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar.sha256
         run: |
           output="$(az vm run-command invoke \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
@@ -79,6 +81,9 @@ jobs:
             --scripts "
               set -eu
               curl -fsSL --retry 3 -o /tmp/simpleweb.jar '$JAR_URL'
+              curl -fsSL --retry 3 -o /tmp/simpleweb.jar.sha256 '$DIGEST_URL'
+              cd /tmp
+              sha256sum -c simpleweb.jar.sha256
               install -o simpleweb -g simpleweb -m 0644 /tmp/simpleweb.jar /opt/simpleweb/test/simpleweb.jar
               printf 'APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n' '${{ github.sha }}' \"\$(date -u +%FT%TZ)\" > /opt/simpleweb/test/app.env
               systemctl restart simpleweb-test
