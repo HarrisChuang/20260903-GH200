@@ -1,0 +1,89 @@
+# 05 - Deploy 到「正式環境」：Approval Gate
+#
+# 教學重點 (Module 5)
+#   - environment: production 掛上 required reviewers 之後，
+#     這個 job 會「暫停」等人按核准，不是壞掉了
+#   - Environment 還可以掛：wait timer、限制哪些分支能部署、環境層級 secret
+#   - 這裡刻意「不重新 build」，而是部署 04 已經驗證過的同一個 artifact，
+#     這就是 build once, deploy many —— 避免每個環境跑出不一樣的產物
+name: 05.deploy-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 輸入 deploy 以確認要部署到正式環境
+        required: true
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation input
+        run: |
+          if [ "${{ inputs.confirm }}" != "deploy" ]; then
+            echo "請在觸發時輸入 deploy 以確認。" >&2
+            exit 1
+          fi
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: guard
+    # production 環境設定了 required reviewer，
+    # 所以這個 job 會停在 Waiting，直到有人核准為止。
+    environment:
+      name: production
+      url: http://${{ vars.VM_PUBLIC_IP }}:8081
+
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # 共享課程訂閱可能有外部 auto-shutdown；部署前先確保 VM 正在執行。
+      - name: Ensure VM is running
+        run: |
+          az vm start \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_VM_NAME }}"
+
+      # 部署 04 已經驗證過、發佈在 build-latest 上的同一份 jar
+      - name: Deploy to production VM
+        env:
+          JAR_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/build-latest/simpleweb.jar
+        run: |
+          az vm run-command invoke \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_VM_NAME }}" \
+            --command-id RunShellScript \
+            --scripts "
+              set -eu
+              curl -fsSL --retry 3 -o /tmp/simpleweb.jar '$JAR_URL'
+              install -o simpleweb -g simpleweb -m 0644 /tmp/simpleweb.jar /opt/simpleweb/prod/simpleweb.jar
+              printf 'APP_BUILD_SHA=%s\nAPP_BUILD_TIME=%s\n' '${{ github.sha }}' \"\$(date -u +%FT%TZ)\" > /opt/simpleweb/prod/app.env
+              systemctl restart simpleweb-prod
+              sleep 5
+              systemctl is-active simpleweb-prod
+            " \
+            --query "value[0].message" -o tsv
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS "http://${{ vars.VM_PUBLIC_IP }}:8081/api/info"; then
+              echo "" && echo "正式環境部署成功"
+              exit 0
+            fi
+            echo "等待應用程式啟動... ($i/10)" && sleep 6
+          done
+          echo "應用程式在時間內沒有回應" >&2
+          exit 1
+
