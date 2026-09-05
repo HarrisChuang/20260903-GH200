@@ -28,7 +28,7 @@ class InfoServiceTest {
     void exposesTheBuildMetadataInjectedByCi() {
         AppInfo info = serviceWith("production", "a1b2c3d", "2026-09-03T00:10:00Z").currentInfo();
 
-        assertThat(info.application()).isEqualTo("SimpleWeb");
+        assertThat(info.application()).isEqualTo("SimpleWeb8");
         assertThat(info.version()).isEqualTo("1.0.0");
         assertThat(info.environment()).isEqualTo("production");
         assertThat(info.buildSha()).isEqualTo("a1b2c3d");
