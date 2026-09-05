@@ -17,10 +17,10 @@ name: Lab01 Hello
 #   需求 b) 也可以在 Actions 頁面按按鈕手動執行 (workflow_dispatch)
 #   提示：`on:` 底下縮排 2 格；`workflow_dispatch:` 後面不需要任何值。
 #
-  on:
-    push:
-      branches: [ main ]
-    workflow_dispatch:
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   # TODO 2: 把這個 job 的 id 改成 hello（YAML 的 key 就是 job id）
