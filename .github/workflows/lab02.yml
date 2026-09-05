@@ -16,8 +16,8 @@ on:
   workflow_dispatch:
 
 # TODO 1: 加上最小權限。這個 workflow 只需要讀取原始碼。
-  permissions:
-    contents: read
+permissions:
+  contents: read
 
 jobs:
   build:
